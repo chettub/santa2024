@@ -1,0 +1,7 @@
+leaderboard
+**/save*
+
+*.pyc
+
+input/
+input/gemma-2
