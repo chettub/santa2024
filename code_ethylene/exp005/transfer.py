@@ -22,7 +22,7 @@ def get_perplexity(text):
 
 df = pd.read_csv(path_input_csv)
 
-for n_exp in range(1, 3):
+for n_exp in range(1, 5):
     # n_exp = 1
     # 後で n_exp=1 も計算
 
@@ -31,7 +31,7 @@ for n_exp in range(1, 3):
     from util import save_text
 
     for n_idx in range(len(df)):
-        n_idx = 3
+        # n_idx = 3
 
         path_save_idx = path_save / f"{n_idx:04d}"
         path_save_idx.mkdir(parents=True, exist_ok=True)
@@ -44,7 +44,7 @@ for n_exp in range(1, 3):
         # save all text
         for path in list_path_txt:
             text = path.read_text()
-            save_text(calculator, n_idx, text, verbose=2)
+            save_text(get_perplexity, n_idx, text, verbose=2)
 
         save_score_memo(score_memo)
 
