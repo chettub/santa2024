@@ -136,4 +136,4 @@ else:
 
         # break
 
-        time.sleep(60 * 20)
+        time.sleep(60 * 30)
