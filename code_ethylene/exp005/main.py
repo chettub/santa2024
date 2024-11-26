@@ -252,7 +252,12 @@ def hillclimbing(
         idx_min = np.argmin(list_perplexity_nxt)
         words_nxt = list_words_nxt[idx_min]
         # perplexity_nxt = list_perplexity_nxt[idx_min]
-        perplexity_nxt = get_perplexity(" ".join(words_nxt))
+        perplexity_nxt_with_error = list_perplexity_nxt[idx_min]
+
+        if perplexity_nxt_with_error < perplexity_best + 2:  # cutoff
+            perplexity_nxt = get_perplexity(" ".join(words_nxt))
+        else:
+            perplexity_nxt = perplexity_nxt_with_error
 
         if iter_now % 50 == 0:
             if verbose:
@@ -293,8 +298,8 @@ for idx in list_idx_randomize:
 
 
 # list_batch_size = [64, 100, 80, 40, 30, 16]
-# list_batch_size = [5, 5, 5, 5, 5, 5]
-list_batch_size = [1, 1, 1, 1, 1, 1]
+list_batch_size = [16, 16, 16, 16, 16, 16]
+# list_batch_size = [1, 1, 1, 1, 1, 1]
 
 list_no_update_cnt = [0] * n_idx_total
 list_num_kick = [1] * n_idx_total

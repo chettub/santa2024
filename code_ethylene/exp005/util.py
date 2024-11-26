@@ -80,8 +80,34 @@ def save_score_memo(score_memo):
 
 
 def get_perplexity_(scorer, score_memo, text):
-    if text in score_memo:
-        return score_memo[text]
-    score = scorer.get_perplexity(text)
-    score_memo[text] = score
-    return score
+    if isinstance(text, str):
+        if text in score_memo:
+            return score_memo[text]
+        score = scorer.get_perplexity(text)
+        score_memo[text] = score
+        return score
+    elif isinstance(text, list):
+        list_score_new = []
+        list_text = text
+        list_text_new = []
+        for t in list_text:
+            if t not in score_memo:
+                list_text_new.append(t)
+
+        if len(list_text_new) > 0:
+            list_score_new = scorer.get_perplexity(list_text_new)
+
+        if len(list_text_new) == 1:
+            score_memo[list_text_new[0]] = list_score_new[0]
+
+        list_score = []
+        for t in list_text:
+            if t in score_memo:
+                list_score.append(score_memo[t])
+            else:
+                list_score.append(list_score_new.pop(0))
+
+        return list_score
+
+    else:
+        raise ValueError("text should be str or list[str]")

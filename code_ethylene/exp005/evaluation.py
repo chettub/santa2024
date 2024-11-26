@@ -137,7 +137,9 @@ class PerplexityCalculator:
         load_in_8bit: bool = False,
         device_map: str = "auto",
     ):
-        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model_path)
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(
+            model_path, padding_side="right"
+        )
         # Configure model loading based on quantization setting and device availability
         if load_in_8bit:
             if DEVICE.type != "cuda":
@@ -159,68 +161,144 @@ class PerplexityCalculator:
 
         self.model.eval()
 
+    # def get_perplexity(
+    #     self, input_texts: Union[str, List[str]], debug=False
+    # ) -> Union[float, List[float]]:
+    #     """
+    #     Calculates the perplexity of given texts.
+
+    #     Parameters
+    #     ----------
+    #     input_texts : str or list of str
+    #         A single string or a list of strings.
+
+    #     batch_size : int, default=None
+    #         Batch size for processing. Defaults to the number of input texts.
+
+    #     debug : bool, default=False
+    #         Print debugging information.
+
+    #     Returns
+    #     -------
+    #     float or list of float
+    #         A single perplexity value if input is a single string,
+    #         or a list of perplexity values if input is a list of strings.
+
+    #     Examples
+    #     --------
+    #     >>> import pandas as pd
+    #     >>> model_path = "/kaggle/input/gemma-2/transformers/gemma-2-9b/2"
+    #     >>> scorer = PerplexityCalculator(model_path=model_path)
+
+    #     >>> submission = pd.DataFrame({
+    #     ...     'id': [0, 1, 2],
+    #     ...     'text': ["this is a normal english sentence", "thsi is a slihgtly misspelled zr4g sentense", "the quick brown fox jumps over the lazy dog"]
+    #     ... })
+    #     >>> perplexities = scorer.get_perplexity(submission["text"].tolist())
+    #     >>> perplexities[0] < perplexities[1]
+    #     True
+    #     >>> perplexities[2] < perplexities[0]
+    #     True
+
+    #     >>> perplexities = scorer.get_perplexity(["this is a sentence", "another sentence"])
+    #     >>> all(p > 0 for p in perplexities)
+    #     True
+
+    #     >>> scorer.clear_gpu_memory()
+    #     """
+    #     single_input = isinstance(input_texts, str)
+    #     input_texts = [input_texts] if single_input else input_texts
+
+    #     loss_list = []
+    #     with torch.no_grad():
+    #         # Process each sequence independently
+    #         for text in input_texts:
+    #             # Explicitly add sequence boundary tokens to the text
+    #             text_with_special = (
+    #                 f"{self.tokenizer.bos_token}{text}{self.tokenizer.eos_token}"
+    #             )
+
+    #             # Tokenize
+    #             model_inputs = self.tokenizer(
+    #                 text_with_special,
+    #                 return_tensors="pt",
+    #                 add_special_tokens=False,
+    #             )
+
+    #             if "token_type_ids" in model_inputs:
+    #                 model_inputs.pop("token_type_ids")
+
+    #             model_inputs = {k: v.to(DEVICE) for k, v in model_inputs.items()}
+
+    #             # Get model output
+    #             output = self.model(**model_inputs, use_cache=False)
+    #             logits = output["logits"]
+
+    #             # Shift logits and labels for calculating loss
+    #             shift_logits = logits[..., :-1, :].contiguous()  # Drop last prediction
+    #             shift_labels = model_inputs["input_ids"][
+    #                 ..., 1:
+    #             ].contiguous()  # Drop first input
+
+    #             # Calculate token-wise loss
+    #             loss = self.loss_fct(
+    #                 shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
+    #             )
+
+    #             # Calculate average loss
+    #             sequence_loss = loss.sum() / len(loss)
+    #             loss_list.append(sequence_loss.cpu().item())
+
+    #             # Debug output
+    #             if debug:
+    #                 print(f"\nProcessing: '{text}'")
+    #                 print(f"With special tokens: '{text_with_special}'")
+    #                 print(f"Input tokens: {model_inputs['input_ids'][0].tolist()}")
+    #                 print(f"Target tokens: {shift_labels[0].tolist()}")
+    #                 print(
+    #                     f"Input decoded: {self.tokenizer.decode(model_inputs['input_ids'][0])}"
+    #                 )
+    #                 print(f"Target decoded: {self.tokenizer.decode(shift_labels[0])}")
+    #                 print(f"Individual losses: {loss.tolist()}")
+    #                 print(f"Average loss: {sequence_loss.item():.4f}")
+
+    #     ppl = [exp(i) for i in loss_list]
+
+    #     if debug:
+    #         print("\nFinal perplexities:")
+    #         for text, perp in zip(input_texts, ppl):
+    #             print(f"Text: '{text}'")
+    #             print(f"Perplexity: {perp:.2f}")
+
+    #     return ppl[0] if single_input else ppl
+
     def get_perplexity(
-        self, input_texts: Union[str, List[str]], debug=False
+        self, input_texts: Union[str, List[str]], batch_size=16
     ) -> Union[float, List[float]]:
-        """
-        Calculates the perplexity of given texts.
-
-        Parameters
-        ----------
-        input_texts : str or list of str
-            A single string or a list of strings.
-
-        batch_size : int, default=None
-            Batch size for processing. Defaults to the number of input texts.
-
-        debug : bool, default=False
-            Print debugging information.
-
-        Returns
-        -------
-        float or list of float
-            A single perplexity value if input is a single string,
-            or a list of perplexity values if input is a list of strings.
-
-        Examples
-        --------
-        >>> import pandas as pd
-        >>> model_path = "/kaggle/input/gemma-2/transformers/gemma-2-9b/2"
-        >>> scorer = PerplexityCalculator(model_path=model_path)
-
-        >>> submission = pd.DataFrame({
-        ...     'id': [0, 1, 2],
-        ...     'text': ["this is a normal english sentence", "thsi is a slihgtly misspelled zr4g sentense", "the quick brown fox jumps over the lazy dog"]
-        ... })
-        >>> perplexities = scorer.get_perplexity(submission["text"].tolist())
-        >>> perplexities[0] < perplexities[1]
-        True
-        >>> perplexities[2] < perplexities[0]
-        True
-
-        >>> perplexities = scorer.get_perplexity(["this is a sentence", "another sentence"])
-        >>> all(p > 0 for p in perplexities)
-        True
-
-        >>> scorer.clear_gpu_memory()
-        """
         single_input = isinstance(input_texts, str)
         input_texts = [input_texts] if single_input else input_texts
 
         loss_list = []
-        with torch.no_grad():
-            # Process each sequence independently
-            for text in input_texts:
+
+        batches = len(input_texts) // batch_size + (len(input_texts) % batch_size != 0)
+        for j in range(batches):
+            a = j * batch_size
+            b = (j + 1) * batch_size
+            input_batch = input_texts[a:b]
+
+            with torch.no_grad():
                 # Explicitly add sequence boundary tokens to the text
-                text_with_special = (
+                text_with_special = [
                     f"{self.tokenizer.bos_token}{text}{self.tokenizer.eos_token}"
-                )
+                    for text in input_batch
+                ]
 
                 # Tokenize
                 model_inputs = self.tokenizer(
                     text_with_special,
                     return_tensors="pt",
                     add_special_tokens=False,
+                    padding=True,
                 )
 
                 if "token_type_ids" in model_inputs:
@@ -232,41 +310,25 @@ class PerplexityCalculator:
                 output = self.model(**model_inputs, use_cache=False)
                 logits = output["logits"]
 
+                label = model_inputs["input_ids"]
+                label[label == self.tokenizer.pad_token_id] = PAD_TOKEN_LABEL_ID
+
                 # Shift logits and labels for calculating loss
                 shift_logits = logits[..., :-1, :].contiguous()  # Drop last prediction
-                shift_labels = model_inputs["input_ids"][
-                    ..., 1:
-                ].contiguous()  # Drop first input
+                shift_labels = label[..., 1:].contiguous()  # Drop first input
 
                 # Calculate token-wise loss
                 loss = self.loss_fct(
                     shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1)
                 )
 
-                # Calculate average loss
-                sequence_loss = loss.sum() / len(loss)
-                loss_list.append(sequence_loss.cpu().item())
+                loss = loss.view(len(logits), -1)
+                valid_length = (shift_labels != PAD_TOKEN_LABEL_ID).sum(dim=-1)
+                loss = torch.sum(loss, -1) / valid_length
 
-                # Debug output
-                if debug:
-                    print(f"\nProcessing: '{text}'")
-                    print(f"With special tokens: '{text_with_special}'")
-                    print(f"Input tokens: {model_inputs['input_ids'][0].tolist()}")
-                    print(f"Target tokens: {shift_labels[0].tolist()}")
-                    print(
-                        f"Input decoded: {self.tokenizer.decode(model_inputs['input_ids'][0])}"
-                    )
-                    print(f"Target decoded: {self.tokenizer.decode(shift_labels[0])}")
-                    print(f"Individual losses: {loss.tolist()}")
-                    print(f"Average loss: {sequence_loss.item():.4f}")
+                loss_list += loss.cpu().tolist()
 
         ppl = [exp(i) for i in loss_list]
-
-        if debug:
-            print("\nFinal perplexities:")
-            for text, perp in zip(input_texts, ppl):
-                print(f"Text: '{text}'")
-                print(f"Perplexity: {perp:.2f}")
 
         return ppl[0] if single_input else ppl
 
